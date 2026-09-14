@@ -1,0 +1,81 @@
+/* Long Exposure — live Plymouth plow tracker */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  background: #0b0d10; color: #f2ede1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+#map { position: fixed; inset: 0; background: #0b0d10; }
+#map.dim { filter: brightness(0.5); transition: filter 1.5s ease; }
+.leaflet-container { background: #0b0d10; font: inherit; }
+.leaflet-control-attribution {
+  background: rgba(11,13,16,0.55) !important; color: rgba(242,237,225,0.4) !important;
+  font-size: 9px !important; letter-spacing: 0.5px;
+}
+.leaflet-control-attribution a { color: rgba(242,237,225,0.4) !important; }
+
+/* plow markers: warm point of light with a faint ring */
+.plowdot { position: relative; width: 22px; height: 22px; }
+.plowdot::before {
+  content: ""; position: absolute; left: 6px; top: 6px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #ffe9c4;
+}
+.plowdot::after {
+  content: ""; position: absolute; left: 1px; top: 1px;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid rgba(255,233,196,0.35);
+}
+
+/* quiet corner readouts */
+#statusline, #wxline, #offnote, #ctl {
+  position: fixed; z-index: 1000; pointer-events: none;
+  font-size: 12px; letter-spacing: 2.5px;
+}
+#statusline { top: 16px; left: 20px; opacity: 0.9; }
+#statusline .livedot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #e8a33d; margin-right: 9px; vertical-align: 1px;
+}
+#statusline .dim { opacity: 0.55; letter-spacing: 1.5px; }
+#wxline { top: 16px; right: 20px; color: #e8a33d; letter-spacing: 1.5px; text-align: right; font-size: 11px; }
+#offnote { bottom: 18px; right: 20px; font-size: 11px; letter-spacing: 1px; opacity: 0.5; }
+
+/* chunky three-state switch */
+#ctl { bottom: 14px; left: 20px; display: flex; align-items: center; gap: 12px; pointer-events: auto; }
+#toggle {
+  width: 64px; height: 32px; border-radius: 16px; cursor: pointer;
+  border: 2px solid #e8a33d; background: transparent; padding: 0; position: relative;
+}
+#toggle::after {
+  content: ""; position: absolute; width: 22px; height: 22px; border-radius: 50%;
+  background: #e8a33d; top: 3px; left: 4px;
+  transition: left 0.35s cubic-bezier(0.6, 0, 0.2, 1.4), background 0.3s;
+}
+#toggle[data-s="on"]::after { left: 34px; }
+#toggle[data-s="auto"]::after { left: 19px; width: 18px; height: 18px; top: 5px; background: transparent; border: 2px solid #e8a33d; }
+#toggle:focus-visible { outline: 2px solid #f2ede1; outline-offset: 3px; }
+#toggleLabel { font-size: 11px; letter-spacing: 2px; opacity: 0.75; }
+
+/* off-season */
+#asleep {
+  position: fixed; inset: 0; z-index: 900;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; text-align: center; padding: 0 24px;
+}
+#asleep[hidden] { display: none; }
+#asleep .a1 { font-size: 22px; letter-spacing: 1px; opacity: 0.9; }
+#asleep .a2 { font-size: 13px; letter-spacing: 1.5px; opacity: 0.45; margin-top: 10px; }
+
+@media (max-width: 600px) {
+  #statusline { left: 14px; top: 12px; font-size: 11px; }
+  #wxline { right: 14px; top: 12px; }
+  #ctl { left: 14px; bottom: 12px; }
+  #offnote { right: 14px; bottom: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #toggle::after { transition: none; }
+  #map.dim { transition: none; }
+}
