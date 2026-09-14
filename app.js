@@ -17,7 +17,7 @@ var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-m
 /* ---------------- map ---------------- */
 var map = L.map('map', { zoomControl: false });
 map.attributionControl.setPrefix(false);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19,
   attribution: '&copy; Esri, HERE, Garmin, OpenStreetMap contributors | City of Plymouth'
 }).addTo(map);
@@ -287,6 +287,9 @@ toggleBtn.addEventListener('click', function () {
 /* ---------------- boot ---------------- */
 requestAnimationFrame(glide);
 setInterval(renderAge, 1000);
+// Don't wait on the weather fetch: one immediate check so AUTO never sits on
+// "Waking up…". checkWeather() follows up and starts live polling if snow comes.
+if (mode === 'auto') pollLive(true);
 checkWeather();
 wxTimer = setInterval(checkWeather, POLL_WX_MS);
 renderStatus();
