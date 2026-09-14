@@ -5,28 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Plow — Plymouth, MN</title>
 <meta name="description" content="Live Plymouth, Minnesota snowplow tracker.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%23e8a33d'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%23b26a00'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
-<div id="map"></div>
 
-<div id="statusline"><span class="livedot"></span><span id="statusText">WAKING UP&hellip;</span></div>
-<div id="wxline"><span id="wxText"></span></div>
+<header id="masthead">
+  <div class="mrow">
+    <div class="brand">Plow <span>Plymouth, Minnesota</span></div>
+    <div class="mright">
+      <div id="wxText" aria-live="polite"></div>
+      <div id="ctl">
+        <button id="toggle" data-s="auto" aria-label="Toggle live updates"></button>
+        <span id="toggleLabel">AUTO</span>
+      </div>
+    </div>
+  </div>
+  <div class="mrow sub">
+    <div id="statusText" aria-live="polite">Waking up&hellip;</div>
+    <div id="offnote"><span id="tempText"></span><span id="ageText"></span></div>
+  </div>
+</header>
 
-<div id="ctl">
-  <button id="toggle" data-s="auto" aria-label="Toggle live updates"></button>
-  <span id="toggleLabel">AUTO</span>
-</div>
-<div id="offnote"><span id="tempText"></span><span id="ageText"></span></div>
-
-<div id="asleep" hidden>
-  <div class="a1">The plows are asleep.</div>
-  <div class="a2">They&rsquo;ll wake for the first snow.</div>
-</div>
+<main id="mapwrap">
+  <div id="map"></div>
+  <div id="asleep" hidden>
+    <div class="a1">The plows are asleep.</div>
+    <div class="a2">They&rsquo;ll wake for the first snow.</div>
+  </div>
+</main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
