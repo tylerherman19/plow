@@ -168,14 +168,18 @@ function renderHistory(feats) {
 }
 
 /* ---------------- polling ---------------- */
-function pollLive() {
+function pollLive(once) {
   return arcgisQuery(0, { outFields: 'AssetName,VehicleID,RecordDateTime,Speed,Heading,RoadTemp' })
     .then(function (d) {
       lastOk = Date.now(); lastErr = '';
       upsertLive(d.features || []);
       renderStatus();
     })
-    .catch(function (e) { lastErr = 'feed'; renderStatus(); });
+    .catch(function (e) {
+      // In AUTO idle there is no repeat timer, so don't promise a retry.
+      lastErr = once ? 'feed-idle' : 'feed';
+      renderStatus();
+    });
 }
 function pollHistory() {
   return arcgisQuery(2, {
@@ -197,6 +201,9 @@ function applyMode() {
     clearInterval(liveTimer); clearInterval(histTimer);
     liveTimer = histTimer = null;
   }
+  // AUTO with no snow never polls, so the page would sit on "Waking up…"
+  // forever. Do a single poll so it can show the off-season state instead.
+  if (mode === 'auto' && !snowComing && lastOk === 0 && !lastErr) pollLive(true);
   renderStatus();
 }
 
@@ -234,7 +241,9 @@ function renderStatus() {
   asleepEl.hidden = !asleep;
   if (asleep) mapEl.classList.add('dim'); else mapEl.classList.remove('dim');
 
-  if (lastErr) {
+  if (lastErr === 'feed-idle') {
+    statusText.textContent = 'Can\u2019t reach the city\u2019s feed';
+  } else if (lastErr) {
     statusText.textContent = 'Can\u2019t reach the city\u2019s feed \u2014 retrying';
   } else if (lastOk === 0) {
     statusText.textContent = 'Waking up\u2026';
@@ -250,7 +259,7 @@ function renderStatus() {
 function renderWx() {
   if (mode === 'auto' && snowComing && snowLabel) {
     wxText.textContent = snowLabel + ' \u00B7 auto-enabled';
-  } else if (mode === 'auto' && !snowComing && lastOk > 0) {
+  } else if (mode === 'auto' && !snowComing) {
     wxText.textContent = 'No snow in forecast';
   } else {
     wxText.textContent = snowLabel;
