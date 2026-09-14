@@ -17,9 +17,9 @@ var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-m
 /* ---------------- map ---------------- */
 var map = L.map('map', { zoomControl: false });
 map.attributionControl.setPrefix(false);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a> | City of Plymouth'
+  attribution: '&copy; Esri, HERE, Garmin, OpenStreetMap contributors | City of Plymouth'
 }).addTo(map);
 map.setView([45.0105, -93.4553], 12);
 
