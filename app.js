@@ -17,7 +17,7 @@ var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-m
 /* ---------------- map ---------------- */
 var map = L.map('map', { zoomControl: false });
 map.attributionControl.setPrefix(false);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a> | City of Plymouth'
 }).addTo(map);
@@ -161,8 +161,8 @@ function renderHistory(feats) {
       (pts[i].t < hourCut ? oldPts : newPts).push(pts[i].p);
       if (i > 0) total += milesBetween(pts[i - 1].p, pts[i].p);
     }
-    if (oldPts.length > 1) L.polyline(oldPts, { color: '#e8a33d', weight: 2, opacity: 0.16, interactive: false }).addTo(trailLayer);
-    if (newPts.length > 1) L.polyline(newPts, { color: '#e8a33d', weight: 2, opacity: 0.42, interactive: false }).addTo(trailLayer);
+    if (oldPts.length > 1) L.polyline(oldPts, { color: '#b26a00', weight: 2, opacity: 0.18, interactive: false }).addTo(trailLayer);
+    if (newPts.length > 1) L.polyline(newPts, { color: '#b26a00', weight: 2, opacity: 0.5, interactive: false }).addTo(trailLayer);
   });
   miles2h = Math.round(total);
 }
@@ -220,9 +220,9 @@ function checkWeather() {
           for (var i = 0; i < periods.length; i++) {
             if (/snow/i.test(periods[i].detailedForecast || '')) { hit = periods[i]; break; }
           }
-          snowLabel = hit ? 'SNOW ' + String(hit.name).toUpperCase() : (snowComing ? 'SNOW IN FORECAST' : '');
+          snowLabel = hit ? 'Snow ' + String(hit.name).toLowerCase() : (snowComing ? 'Snow in forecast' : '');
         })
-        .catch(function () { snowLabel = snowComing ? 'SNOW IN FORECAST' : ''; });
+        .catch(function () { snowLabel = snowComing ? 'Snow in forecast' : ''; });
     })
     .catch(function () { snowComing = false; snowLabel = ''; })
     .then(function () { renderWx(); applyMode(); });
@@ -235,23 +235,23 @@ function renderStatus() {
   if (asleep) mapEl.classList.add('dim'); else mapEl.classList.remove('dim');
 
   if (lastErr) {
-    statusText.innerHTML = 'CAN\u2019T REACH THE CITY\u2019S FEED \u2014 RETRYING';
+    statusText.textContent = 'Can\u2019t reach the city\u2019s feed \u2014 retrying';
   } else if (lastOk === 0) {
-    statusText.textContent = 'WAKING UP\u2026';
+    statusText.textContent = 'Waking up\u2026';
   } else if (asleep) {
-    statusText.innerHTML = 'ALL QUIET <span class="dim">\u00B7 OFF-SEASON</span>';
+    statusText.innerHTML = '<span class="n">0</span> plows out <span class="sub">\u00B7 off-season</span>';
   } else {
-    statusText.innerHTML = plowCount + ' PLOW' + (plowCount === 1 ? '' : 'S') + ' OUT <span class="dim">\u00B7 ' +
-      miles2h + ' MI / 2 HRS</span>';
+    statusText.innerHTML = '<span class="n">' + plowCount + '</span> plow' + (plowCount === 1 ? '' : 's') + ' out ' +
+      '<span class="sub">\u00B7 ' + miles2h + ' mi over the last 2 hrs</span>';
   }
-  tempText.textContent = roadTemp != null ? 'ROAD ' + roadTemp + '\u00B0F \u00B7 ' : '';
+  tempText.textContent = roadTemp != null ? 'road ' + roadTemp + '\u00B0F \u00B7 ' : '';
   renderWx();
 }
 function renderWx() {
   if (mode === 'auto' && snowComing && snowLabel) {
-    wxText.textContent = snowLabel + ' \u00B7 AUTO-ENABLED';
+    wxText.textContent = snowLabel + ' \u00B7 auto-enabled';
   } else if (mode === 'auto' && !snowComing && lastOk > 0) {
-    wxText.textContent = 'NO SNOW IN FORECAST';
+    wxText.textContent = 'No snow in forecast';
   } else {
     wxText.textContent = snowLabel;
   }
@@ -259,9 +259,9 @@ function renderWx() {
 function renderAge() {
   if (lastOk > 0 && liveTimer) {
     var s = Math.round((Date.now() - lastOk) / 1000);
-    ageText.textContent = 'UPDATED ' + s + 's AGO';
+    ageText.textContent = 'updated ' + s + 's ago';
   } else if (!liveTimer && lastOk > 0) {
-    ageText.textContent = 'PAUSED';
+    ageText.textContent = 'paused';
   } else {
     ageText.textContent = '';
   }
