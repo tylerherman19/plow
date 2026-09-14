@@ -22,6 +22,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_L
   attribution: '&copy; Esri, HERE, Garmin, OpenStreetMap contributors | City of Plymouth'
 }).addTo(map);
 map.setView([45.0105, -93.4553], 12);
+setTimeout(function () { map.invalidateSize(); }, 100);
 
 var liveLayer = L.layerGroup().addTo(map);
 var trailLayer = L.layerGroup().addTo(map);
