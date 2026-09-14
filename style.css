@@ -8,6 +8,7 @@ html, body {
 }
 #map { position: fixed; inset: 0; background: #faf7f0; }
 #map.dim { filter: saturate(0.55) brightness(0.97); transition: filter 1.5s ease; }
+.leaflet-tile-pane { filter: sepia(0.18) brightness(1.03); }
 .leaflet-container { background: #faf7f0; font: inherit; }
 .leaflet-control-attribution {
   background: rgba(250,247,240,0.7) !important; color: rgba(25,24,19,0.45) !important;
@@ -57,16 +58,18 @@ html, body {
   border-top: 1px solid rgba(25,24,19,0.2); padding-top: 10px;
 }
 #toggle {
-  width: 58px; height: 28px; border-radius: 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  width: 64px; height: 32px; border-radius: 0; cursor: pointer;
   border: 1.5px solid #191813; background: transparent; padding: 0; position: relative;
+  font: inherit; color: inherit;
 }
 #toggle::after {
-  content: ""; position: absolute; width: 18px; height: 18px;
-  background: #191813; top: 3.5px; left: 4px;
+  content: ""; position: absolute; width: 20px; height: 20px;
+  background: #191813; top: 4.5px; left: 5px;
   transition: left 0.32s cubic-bezier(0.6, 0, 0.2, 1.2);
 }
-#toggle[data-s="on"]::after { left: 32px; }
-#toggle[data-s="auto"]::after { left: 18px; width: 14px; background: transparent; border: 1.5px solid #191813; top: 5.5px; }
+#toggle[data-s="on"]::after { left: 37px; }
+#toggle[data-s="auto"]::after { left: 21px; width: 14px; background: transparent; border: 1.5px solid #191813; top: 6.5px; }
 #toggle:focus-visible { outline: 2px solid #b26a00; outline-offset: 3px; }
 #toggleLabel {
   font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
