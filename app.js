@@ -87,6 +87,10 @@ function setTiles() {
 }
 setTiles();
 
+function zoomClass() { map.getContainer().classList.toggle('far', map.getZoom() < 14); }
+map.on('zoomend', zoomClass);
+zoomClass();
+
 var canvas = L.canvas({ padding: 0.5 });
 var trailLayer = L.layerGroup().addTo(map);
 var markerLayer = L.layerGroup().addTo(map);
@@ -407,22 +411,22 @@ function moveSliders(instant) {
     if (instant || reduceMotion) { void ind.offsetWidth; ind.style.transition = ''; }
   });
 }
-function enter(tbody, offset) {
+function enter(tbody) {
   if (reduceMotion || !tbody) return;
-  [].forEach.call(tbody.rows, function (r, i) { r.style.setProperty('--i', i + (offset || 0)); });
   tbody.classList.remove('enter'); void tbody.offsetWidth; tbody.classList.add('enter');
   clearTimeout(tbody._enterT);
-  tbody._enterT = setTimeout(function () { tbody.classList.remove('enter'); }, 400 + 30 * (tbody.rows.length + (offset || 0)));
+  tbody._enterT = setTimeout(function () { tbody.classList.remove('enter'); }, 250);
 }
 
 /* ---------------- panel ---------------- */
 function renderLive() {
-  var el = $('live'), state = $('liveState'), txt = $('liveText');
-  if (document.hidden) { el.className = 'live'; state.textContent = 'Paused'; txt.textContent = ''; return; }
-  if (liveErr) { el.className = 'live err'; state.textContent = 'Offline'; txt.textContent = 'retrying'; return; }
-  if (!liveOk) { el.className = 'live'; state.textContent = 'Connecting'; txt.textContent = ''; return; }
-  el.className = 'live ok'; state.textContent = 'Live';
-  txt.textContent = 'updated ' + ago(Date.now() - liveOk);
+  var el = $('status'), err = false, txt;
+  if (document.hidden) txt = 'Paused';
+  else if (liveErr) { txt = 'City feed not responding'; err = true; }
+  else if (!liveOk) txt = 'Connecting…';
+  else txt = 'Updated ' + new Date(liveOk).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  el.textContent = txt;
+  el.className = 'status' + (err ? ' err' : '');
 }
 
 function listRows(f, now) {
@@ -458,13 +462,13 @@ function renderSummary() {
     $('sTempSub').textContent = '(avg of ' + temps.length + ')';
   } else {
     roll($('sTemp'), '–');
-    $('sTempSub').textContent = 'no sensor data';
+    $('sTempSub').textContent = 'not reported';
   }
 }
 
 function statusCell(v, st) {
-  if (st === 'moving') return v.salting ? '<span class="st moving salt">Moving + Salting</span>' : '<span class="st moving">Moving</span>';
-  if (st === 'idle') return v.salting ? '<span class="st stsalt salt">Salting (stopped)</span>' : '<span class="st idle">Idle</span>';
+  if (st === 'moving') return '<span class="st moving">' + (v.salting ? 'Moving, salting' : 'Moving') + '</span>';
+  if (st === 'idle') return v.salting ? '<span class="st stsalt">Salting, stopped</span>' : '<span class="st idle">Idle</span>';
   return '<span class="st parked">Parked</span>';
 }
 function renderList() {
@@ -481,12 +485,11 @@ function renderList() {
     tb.innerHTML = '<tr class="empty"><td colspan="5">' + (liveOk || loadedFrom ? 'No ' + (fleet === 'snow' ? 'snow trucks' : 'city vehicles') + ' out in the last ' + win + ' hr' + (win === 1 ? '' : 's') + '.' : 'Loading…') + '</td></tr>';
     return;
   }
-  var n = 0;
+  $('milesH').textContent = 'Miles (' + win + 'h)';
   tb.innerHTML = rows.map(function (v) {
-    var st = status(v, now), sn = shortName(v), extra = v.name.slice(sn.length).trim();
-    var sub = extra || (fleet === 'all' || !isSnow(v.fleet) || v.fleet !== 'City of Plymouth Streets' ? fleetLabel(v.fleet) : '');
-    return '<tr tabindex="0" style="--i:' + (n++) + '" data-id="' + esc(v.id) + '"' + (same(v.id, selected) ? ' class="sel" aria-selected="true"' : '') + ' title="' + esc(fleetLabel(v.fleet) + ' · ' + v.name) + '">' +
-      '<td>' + esc(sn) + (sub ? '<span class="nm">' + esc(sub) + '</span>' : '') + '</td>' +
+    var st = status(v, now);
+    return '<tr tabindex="0" data-id="' + esc(v.id) + '"' + (same(v.id, selected) ? ' class="sel" aria-selected="true"' : '') + ' title="' + esc(fleetLabel(v.fleet) + ' · ' + v.name) + '">' +
+      '<td>' + esc(shortName(v)) + '</td>' +
       '<td>' + statusCell(v, st) + '</td>' +
       '<td class="num">' + (st === 'parked' ? '–' : (st === 'moving' ? Math.round(v.speed || 0) : 0) + ' mph') + '</td>' +
       '<td>' + ago(now - v.t) + '</td>' +
@@ -509,9 +512,9 @@ function renderNotice() {
   var el = $('notice'), msg = '', err = false;
   if (liveErr && !liveOk) { msg = 'Can’t reach the City of Plymouth’s vehicle feed right now. It will keep retrying.'; err = true; }
   else if (forecast && forecast.s48 === 0 && !anySaltToday()) {
-    msg = 'No snow in the forecast. Trucks on the map are doing regular street work, not plowing.';
+    msg = 'No snow in the forecast. Trucks out today are on regular street work, not plowing.';
   }
-  el.hidden = !msg; el.textContent = msg; el.className = 'notice' + (err ? ' err' : '');
+  el.hidden = !msg; el.textContent = msg; el.className = 'note' + (err ? ' err' : '');
 }
 function anySaltToday() {
   var cut = Date.now() - MAX_HOURS * 3600e3;
@@ -573,14 +576,6 @@ document.querySelectorAll('[data-win]').forEach(function (b) {
     listEnter = true;
     renderTrails(); renderList();
     if (Date.now() - win * 3600e3 < loadedFrom) pollHistory();
-  });
-});
-document.querySelectorAll('[data-jump]').forEach(function (a) {
-  a.addEventListener('click', function (e) {
-    var t = $(a.getAttribute('data-jump'));
-    if (!t) return;
-    e.preventDefault();
-    t.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
   });
 });
 $('zin').addEventListener('click', function () { map.zoomIn(); });
@@ -712,7 +707,7 @@ function checkWeather() {
         return '<tr title="' + esc(per.shortForecast || '') + '"><td>' + esc(per.name) + '</td><td' + (snowy ? ' class="snowy"' : '') + '>' + esc(snowTxt) + '</td><td>' +
           (tr ? fmtRange(tr, cToF, '°') : esc(per.temperature) + '°') + '</td><td>' + esc(((per.windDirection || '') + ' ' + wind).trim()) + '</td></tr>';
       }).join('');
-      enter($('fcPeriods'), 2);
+      enter($('fcPeriods'));
     });
   }).catch(function () {
     $('fcTotals').innerHTML = '<tr><td colspan="4" class="muted">Forecast unavailable right now.</td></tr>';
@@ -748,7 +743,6 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener('change', function () { setTiles(); renderTrails(); });
 
 requestAnimationFrame(glide);
-setInterval(renderLive, 1000);
 setInterval(function () { if (!document.hidden) { renderTrails(); renderList(); renderSummary(); } }, 60000); // ages drift
 renderLegend(); renderSummary(); renderList();
 if (!document.hidden) start(); else renderLive();

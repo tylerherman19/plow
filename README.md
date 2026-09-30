@@ -11,13 +11,13 @@ where it has driven, who is salting, and how much snow is coming.
   and average road temperature from truck sensors when they report it.
 - **Snow forecast:** a table with snow, temperature range and wind for the next 24 hours,
   the next 48 hours and the next four NWS forecast periods. Any active NWS alerts appear above it.
-- **Trucks:** a table with status (Moving, Moving + Salting, Salting (stopped), Idle, Parked),
+- **Trucks:** a table with status (Moving, Moving, salting, Salting, stopped, Idle, Parked),
   speed, last report and miles. Select a row to fly to that truck and highlight its route.
   Switch between the snow fleet (plows and cul-de-sac trucks) and all city vehicles.
 - **Map:** live trucks, trails shaded by age with a 1, 3, 12 or 24 hour window,
-  orange dots where a truck was salting, a summary chip, and a my-location button.
-- When there's no snow in the forecast and nobody is salting, a banner explains that
-  trucks on the map are doing regular street work, not plowing.
+  orange dots where a truck was salting, a summary of the window, and a my-location button.
+- When there's no snow in the forecast and nobody is salting, a line under Fleet now says
+  the trucks are doing regular street work, not plowing.
 
 ## How it works
 
