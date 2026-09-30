@@ -7,15 +7,15 @@ where it has driven, who is salting, and how much snow is coming.
 
 ## What's on the page
 
-- **Map:** live truck positions (arrow = moving, with heading; hollow = stopped),
-  plus trails colored by age. Choose a 1, 3, 12 or 24 hour window. Salting shows in orange.
-- **Fleet summary:** snow trucks moving and on the road, trucks salting now, miles driven
-  in the window, and road/air temperature from truck sensors when they report it.
-- **Truck list:** every snow-fleet truck (plows and cul-de-sac trucks) with its status, speed,
-  last report, and miles driven. Tap one to fly to it and highlight its route.
-  Switch to **All city** to include sweepers, utilities, and other vehicles.
-- **Snow forecast:** NWS snowfall for the next 24 and 48 hours, the next four forecast
-  periods, and any active NWS alerts (e.g. Winter Storm Warning).
+- **Fleet now:** snow trucks moving, trucks salting right now, miles driven since midnight,
+  and average road temperature from truck sensors when they report it.
+- **Snow forecast:** a table with snow, temperature range and wind for the next 24 hours,
+  the next 48 hours and the next four NWS forecast periods. Any active NWS alerts appear above it.
+- **Trucks:** a table with status (Moving, Moving + Salting, Salting (stopped), Idle, Parked),
+  speed, last report and miles. Select a row to fly to that truck and highlight its route.
+  Switch between the snow fleet (plows and cul-de-sac trucks) and all city vehicles.
+- **Map:** live trucks, trails shaded by age with a 1, 3, 12 or 24 hour window,
+  orange dots where a truck was salting, a summary chip, and a my-location button.
 - When there's no snow in the forecast and nobody is salting, a banner explains that
   trucks on the map are doing regular street work, not plowing.
 
