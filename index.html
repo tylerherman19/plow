@@ -4,39 +4,77 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Plow — Plymouth, MN</title>
-<meta name="description" content="Live Plymouth, Minnesota snowplow tracker.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%23b26a00'/%3E%3C/svg%3E">
+<meta name="description" content="Live Plymouth, Minnesota snowplow dashboard: where every truck is, where it has been, who is salting, and the snow forecast.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%232a78d6'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
-<header id="masthead">
-  <div class="mrow">
-    <div class="brand">Plow <span>Plymouth, Minnesota</span></div>
-    <div class="mright">
-      <div id="wxText" aria-live="polite"></div>
-      <div id="ctl">
-        <button id="toggle" data-s="auto" aria-label="Toggle live updates"></button>
-        <span id="toggleLabel">AUTO</span>
-      </div>
-    </div>
-  </div>
-  <div class="mrow sub">
-    <div id="statusText" aria-live="polite">Waking up&hellip;</div>
-    <div id="offnote"><span id="tempText"></span><span id="ageText"></span></div>
-  </div>
+<header class="top">
+  <div class="brand">Plow <span>Plymouth, MN</span></div>
+  <div class="live" id="live" aria-live="polite"><i class="pulse"></i><span id="liveText">Connecting&hellip;</span></div>
 </header>
 
-<main id="mapwrap">
-  <div id="map"></div>
-  <div id="asleep" hidden>
-    <div class="a1">The plows are asleep.</div>
-    <div class="a2">They&rsquo;ll wake for the first snow.</div>
-  </div>
-</main>
+<div class="app">
+  <aside class="panel" aria-label="Plow dashboard">
+
+    <div id="alerts"></div>
+    <div id="notice" class="notice" hidden></div>
+
+    <section class="tiles" aria-label="Fleet summary">
+      <div class="tile"><div class="tv" id="tMoving">&ndash;</div><div class="tl" id="tMovingLabel">trucks moving</div><div class="ts" id="tMovingSub"></div></div>
+      <div class="tile"><div class="tv" id="tSalting">&ndash;</div><div class="tl">salting now</div><div class="ts" id="tSaltingSub"></div></div>
+      <div class="tile"><div class="tv" id="tMiles">&ndash;</div><div class="tl" id="tMilesLabel">miles driven</div><div class="ts">snow fleet</div></div>
+      <div class="tile"><div class="tv" id="tTemp">&ndash;</div><div class="tl">road temp</div><div class="ts" id="tTempSub">from truck sensors</div></div>
+    </section>
+
+    <section class="card" aria-labelledby="fcH">
+      <h2 id="fcH">Snow forecast</h2>
+      <div class="snow">
+        <div><span class="sv" id="snow24">&ndash;</span><span class="sl">next 24 hrs</span></div>
+        <div><span class="sv" id="snow48">&ndash;</span><span class="sl">next 48 hrs</span></div>
+      </div>
+      <ol class="periods" id="periods"></ol>
+      <div class="src">National Weather Service &middot; <a href="https://forecast.weather.gov/MapClick.php?lat=45.0105&amp;lon=-93.4553" target="_blank" rel="noopener">full forecast</a></div>
+    </section>
+
+    <section class="card" aria-labelledby="trH">
+      <div class="cardhead">
+        <h2 id="trH">Trucks</h2>
+        <div class="seg" role="group" aria-label="Which vehicles">
+          <button data-fleet="snow" aria-pressed="true">Snow fleet</button>
+          <button data-fleet="all" aria-pressed="false">All city</button>
+        </div>
+      </div>
+      <ul class="trucks" id="trucks"></ul>
+      <p class="hint">Tap a truck to find it and highlight its route.</p>
+    </section>
+
+    <footer class="about">
+      <p>Live GPS from the City of Plymouth&rsquo;s public vehicle feed, refreshed every 5 seconds while this page is open. Trails show where trucks drove, not a guarantee a street is fully cleared. &ldquo;Salting&rdquo; means the spreader is reporting a non-zero rate.</p>
+      <p>Not affiliated with the city. For snow emergencies and parking rules see <a href="https://www.plymouthmn.gov/departments/public-works/streets/snow-removal" target="_blank" rel="noopener">plymouthmn.gov</a>.</p>
+    </footer>
+  </aside>
+
+  <main class="mapwrap">
+    <div id="map" role="region" aria-label="Map of trucks and trails"></div>
+    <div class="mapctl">
+      <div class="seg" role="group" aria-label="Trail window">
+        <button data-win="1" aria-pressed="false">1h</button>
+        <button data-win="3" aria-pressed="true">3h</button>
+        <button data-win="12" aria-pressed="false">12h</button>
+        <button data-win="24" aria-pressed="false">24h</button>
+      </div>
+      <button class="fit" id="fit" title="Zoom to all trucks">Fit</button>
+    </div>
+    <div class="legend" id="legend" aria-label="Trail legend"></div>
+    <div class="loading" id="loading" hidden>Loading trails&hellip;</div>
+  </main>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
