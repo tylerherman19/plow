@@ -366,6 +366,55 @@ function glide() {
   requestAnimationFrame(glide);
 }
 
+/* ---------------- motion: rolling digits, sliding toggles, row entrances ---------------- */
+var listEnter = false;
+function roll(el, text) {
+  text = String(text);
+  if (el.getAttribute('data-val') === text) return;
+  el.setAttribute('data-val', text);
+  if (reduceMotion) { el.textContent = text; return; }
+  var shape = text.replace(/\d/g, '0');
+  var fresh = el.getAttribute('data-shape') !== shape;
+  if (fresh) {
+    el.setAttribute('data-shape', shape);
+    el.innerHTML = '<span class="sr"></span>' + text.split('').map(function (c) {
+      if (!/\d/.test(c)) return '<span aria-hidden="true">' + esc(c) + '</span>';
+      return '<span class="dg" aria-hidden="true"><span class="strip"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>' +
+        '<span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></span></span>';
+    }).join('');
+    void el.offsetWidth; // start each strip at 0 so a new number rolls up
+  }
+  el.querySelector('.sr').textContent = text;
+  var strips = el.querySelectorAll('.strip'), k = 0;
+  text.split('').forEach(function (c) {
+    if (/\d/.test(c)) strips[k++].style.transform = 'translateY(' + (-10 * +c) + '%)';
+  });
+}
+function initSlider(group) {
+  var ind = document.createElement('span');
+  ind.className = 'slide'; ind.setAttribute('aria-hidden', 'true');
+  group.insertBefore(ind, group.firstChild);
+  group.classList.add('has-slide');
+}
+function moveSliders(instant) {
+  document.querySelectorAll('.has-slide').forEach(function (g) {
+    var b = g.querySelector('button[aria-pressed="true"]'), ind = g.querySelector('.slide');
+    if (!b || !ind) return;
+    if (instant || reduceMotion) ind.style.transition = 'none';
+    ind.style.width = b.offsetWidth + 'px';
+    ind.style.height = b.offsetHeight + 'px';
+    ind.style.transform = 'translate(' + b.offsetLeft + 'px,' + b.offsetTop + 'px)';
+    if (instant || reduceMotion) { void ind.offsetWidth; ind.style.transition = ''; }
+  });
+}
+function enter(tbody, offset) {
+  if (reduceMotion || !tbody) return;
+  [].forEach.call(tbody.rows, function (r, i) { r.style.setProperty('--i', i + (offset || 0)); });
+  tbody.classList.remove('enter'); void tbody.offsetWidth; tbody.classList.add('enter');
+  clearTimeout(tbody._enterT);
+  tbody._enterT = setTimeout(function () { tbody.classList.remove('enter'); }, 400 + 30 * (tbody.rows.length + (offset || 0)));
+}
+
 /* ---------------- panel ---------------- */
 function renderLive() {
   var el = $('live'), state = $('liveState'), txt = $('liveText');
@@ -397,18 +446,18 @@ function renderSummary() {
     if (v.salting) { salting++; if (v.material) mat[v.material.toLowerCase()] = 1; }
     if (v.roadTemp != null) temps.push(v.roadTemp);
   });
-  $('sMoving').textContent = liveOk ? moving : '–';
+  roll($('sMoving'), liveOk ? moving : '–');
   $('sMovingLabel').textContent = moving === 1 ? 'Truck moving' : 'Trucks moving';
   $('sMovingSub').textContent = liveOk ? 'of ' + total + ' today' : ' ';
-  $('sSalting').textContent = liveOk ? salting : '–';
+  roll($('sSalting'), liveOk ? salting : '–');
   var m = Object.keys(mat);
   $('sSaltingSub').textContent = salting ? (m.length ? m.join(', ') : 'spreading') : (liveOk ? 'none now' : ' ');
-  $('sMiles').textContent = loadedFrom ? fmtMi(today) : '–';
+  roll($('sMiles'), loadedFrom ? fmtMi(today) : '–');
   if (temps.length) {
-    $('sTemp').textContent = Math.round(temps.reduce(function (x, y) { return x + y; }, 0) / temps.length) + '°F';
+    roll($('sTemp'), Math.round(temps.reduce(function (x, y) { return x + y; }, 0) / temps.length) + '°F');
     $('sTempSub').textContent = '(avg of ' + temps.length + ')';
   } else {
-    $('sTemp').textContent = '–';
+    roll($('sTemp'), '–');
     $('sTempSub').textContent = 'no sensor data';
   }
 }
@@ -421,8 +470,10 @@ function statusCell(v, st) {
 function renderList() {
   var now = Date.now();
   var rows = listRows(fleet, now);
+  if (listEnter) { listEnter = false; enter($('trucks')); }
   $('cSnow').textContent = '(' + listRows('snow', now).length + ')';
   $('cAll').textContent = '(' + listRows('all', now).length + ')';
+  moveSliders();
   var rank = { moving: 0, idle: 1, parked: 2 };
   rows.sort(function (a, b) { return rank[status(a, now)] - rank[status(b, now)] || nameSort(a, b); });
   var tb = $('trucks');
@@ -430,10 +481,11 @@ function renderList() {
     tb.innerHTML = '<tr class="empty"><td colspan="5">' + (liveOk || loadedFrom ? 'No ' + (fleet === 'snow' ? 'snow trucks' : 'city vehicles') + ' out in the last ' + win + ' hr' + (win === 1 ? '' : 's') + '.' : 'Loading…') + '</td></tr>';
     return;
   }
+  var n = 0;
   tb.innerHTML = rows.map(function (v) {
     var st = status(v, now), sn = shortName(v), extra = v.name.slice(sn.length).trim();
     var sub = extra || (fleet === 'all' || !isSnow(v.fleet) || v.fleet !== 'City of Plymouth Streets' ? fleetLabel(v.fleet) : '');
-    return '<tr tabindex="0" data-id="' + esc(v.id) + '"' + (same(v.id, selected) ? ' class="sel" aria-selected="true"' : '') + ' title="' + esc(fleetLabel(v.fleet) + ' · ' + v.name) + '">' +
+    return '<tr tabindex="0" style="--i:' + (n++) + '" data-id="' + esc(v.id) + '"' + (same(v.id, selected) ? ' class="sel" aria-selected="true"' : '') + ' title="' + esc(fleetLabel(v.fleet) + ' · ' + v.name) + '">' +
       '<td>' + esc(sn) + (sub ? '<span class="nm">' + esc(sub) + '</span>' : '') + '</td>' +
       '<td>' + statusCell(v, st) + '</td>' +
       '<td class="num">' + (st === 'parked' ? '–' : (st === 'moving' ? Math.round(v.speed || 0) : 0) + ' mph') + '</td>' +
@@ -503,12 +555,14 @@ map.on('click', function () { if (selected != null) select(selected); });
 
 function pressed(sel, attr, val) {
   document.querySelectorAll(sel).forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === String(val))); });
+  moveSliders();
 }
 document.querySelectorAll('[data-fleet]').forEach(function (b) {
   b.addEventListener('click', function () {
     fleet = b.getAttribute('data-fleet'); store('fleet', fleet);
     pressed('[data-fleet]', 'data-fleet', fleet);
     if (selected != null && vehicles[selected] && !inFilter(vehicles[selected])) selected = null;
+    listEnter = true;
     renderMarkers(); renderTrails(); renderList();
   });
 });
@@ -516,6 +570,7 @@ document.querySelectorAll('[data-win]').forEach(function (b) {
   b.addEventListener('click', function () {
     win = +b.getAttribute('data-win'); store('win', win);
     pressed('[data-win]', 'data-win', win);
+    listEnter = true;
     renderTrails(); renderList();
     if (Date.now() - win * 3600e3 < loadedFrom) pollHistory();
   });
@@ -555,8 +610,12 @@ $('fit').addEventListener('click', function () {
   if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom: 15, animate: !reduceMotion });
   else map.setView(HOME, 12);
 });
+document.querySelectorAll('.seg, .tabs').forEach(initSlider);
 pressed('[data-fleet]', 'data-fleet', fleet);
 pressed('[data-win]', 'data-win', win);
+moveSliders(true);
+window.addEventListener('resize', function () { moveSliders(true); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { moveSliders(true); });
 
 /* ---------------- weather (NWS, free, no key) ---------------- */
 function nws(url) {
@@ -640,6 +699,7 @@ function checkWeather() {
     var r24 = row('Next 24 hours', 24), r48 = row('Next 48 hours', 48);
     forecast = { s24: r24.s, s48: r48.s };
     $('fcTotals').innerHTML = r24.html + r48.html;
+    enter($('fcTotals'));
     renderNotice();
     return fcP.then(function (periods) {
       $('fcPeriods').innerHTML = periods.slice(0, 4).map(function (per) {
@@ -652,6 +712,7 @@ function checkWeather() {
         return '<tr title="' + esc(per.shortForecast || '') + '"><td>' + esc(per.name) + '</td><td' + (snowy ? ' class="snowy"' : '') + '>' + esc(snowTxt) + '</td><td>' +
           (tr ? fmtRange(tr, cToF, '°') : esc(per.temperature) + '°') + '</td><td>' + esc(((per.windDirection || '') + ' ' + wind).trim()) + '</td></tr>';
       }).join('');
+      enter($('fcPeriods'), 2);
     });
   }).catch(function () {
     $('fcTotals').innerHTML = '<tr><td colspan="4" class="muted">Forecast unavailable right now.</td></tr>';
