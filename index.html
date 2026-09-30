@@ -8,31 +8,25 @@
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%231a6ee6'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
 <header class="top">
   <div class="brand"><span class="word">PLOW</span><span class="place">Plymouth, Minnesota</span></div>
-  <nav class="nav">
-    <div class="live" id="live" aria-live="polite"><i class="pulse"></i><b id="liveState">Connecting</b><span id="liveText"></span></div>
-    <span class="vr" aria-hidden="true"></span>
-    <a href="#forecast" data-jump="forecast">Weather</a>
-    <a href="#about" data-jump="about">About</a>
-  </nav>
+  <div class="status" id="status" aria-live="polite">Connecting&hellip;</div>
 </header>
 
 <div class="app">
   <aside class="panel" id="panel" aria-label="Plow dashboard">
 
     <div id="alerts"></div>
-    <div id="notice" class="notice" hidden></div>
 
     <section class="sec" aria-labelledby="fleetH">
       <h2 id="fleetH">Fleet now</h2>
-      <p class="subh">Live data from Plymouth Public Works</p>
+      <p class="note" id="notice" hidden></p>
       <div class="stats">
-        <div class="stat"><div class="sv accent" id="sMoving">&ndash;</div><div class="sl" id="sMovingLabel">Trucks moving</div><div class="ss" id="sMovingSub">&nbsp;</div></div>
+        <div class="stat"><div class="sv" id="sMoving">&ndash;</div><div class="sl" id="sMovingLabel">Trucks moving</div><div class="ss" id="sMovingSub">&nbsp;</div></div>
         <div class="stat"><div class="sv" id="sSalting">&ndash;</div><div class="sl">Salting now</div><div class="ss" id="sSaltingSub">&nbsp;</div></div>
         <div class="stat"><div class="sv" id="sMiles">&ndash;</div><div class="sl">Miles driven</div><div class="ss">since 12 AM</div></div>
         <div class="stat"><div class="sv" id="sTemp">&ndash;</div><div class="sl">Road temp</div><div class="ss" id="sTempSub">(avg)</div></div>
@@ -41,13 +35,12 @@
 
     <section class="sec" id="forecast" aria-labelledby="fcH">
       <h2 id="fcH">Snow forecast</h2>
-      <p class="subh">Plymouth, MN &middot; National Weather Service</p>
       <table class="fc">
         <thead><tr><th scope="col">Period</th><th scope="col">Snow</th><th scope="col">Temp</th><th scope="col">Wind</th></tr></thead>
         <tbody id="fcTotals"><tr><td colspan="4" class="muted">Loading forecast&hellip;</td></tr></tbody>
         <tbody id="fcPeriods"></tbody>
       </table>
-      <p class="fine"><a href="https://forecast.weather.gov/MapClick.php?lat=45.0105&amp;lon=-93.4553" target="_blank" rel="noopener">Full NWS forecast</a></p>
+      <p class="fine">From the National Weather Service. <a href="https://forecast.weather.gov/MapClick.php?lat=45.0105&amp;lon=-93.4553" target="_blank" rel="noopener">Full forecast</a></p>
     </section>
 
     <section class="sec" aria-labelledby="trH">
@@ -57,15 +50,14 @@
         <button data-fleet="all" aria-pressed="false">All city vehicles <span id="cAll"></span></button>
       </div>
       <table class="tt">
-        <thead><tr><th scope="col">#</th><th scope="col">Status</th><th scope="col" class="num">Speed</th><th scope="col">Last report</th><th scope="col" class="num">Miles</th></tr></thead>
+        <thead><tr><th scope="col">#</th><th scope="col">Status</th><th scope="col" class="num">Speed</th><th scope="col">Last report</th><th scope="col" class="num" id="milesH">Miles</th></tr></thead>
         <tbody id="trucks"></tbody>
       </table>
-      <p class="fine">Select a truck to find it on the map and highlight its route. Miles are for the selected time window.</p>
     </section>
 
     <footer class="source" id="about">
-      <p><b>Source:</b> City of Plymouth public vehicle feed (PreCise AVL), refreshed every 5 seconds while this page is open. Forecast and alerts from the National Weather Service.</p>
-      <p>Trails show where trucks drove, not a guarantee a street is fully cleared. &ldquo;Salting&rdquo; means the spreader reports a non-zero rate. This site is for information only and is not affiliated with the city &mdash; for snow emergencies and parking rules see <a href="https://www.plymouthmn.gov/departments/public-works/streets/snow-removal" target="_blank" rel="noopener">plymouthmn.gov</a>.</p>
+      <p>Truck positions come from the City of Plymouth&rsquo;s public vehicle feed and refresh every 5 seconds. A trail means a truck drove there, not that the street is fully cleared. Salting means the spreader is reporting a rate above zero.</p>
+      <p>Not run by the city. Snow emergency and parking rules are on <a href="https://www.plymouthmn.gov/departments/public-works/streets/snow-removal" target="_blank" rel="noopener">plymouthmn.gov</a>.</p>
     </footer>
   </aside>
 
@@ -92,6 +84,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
