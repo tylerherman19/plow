@@ -6,60 +6,72 @@
 <title>Plow — Plymouth, MN</title>
 <meta name="description" content="Live Plymouth, Minnesota snowplow dashboard: where every truck is, where it has been, who is salting, and the snow forecast.">
 <meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%232a78d6'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%231a6ee6'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
 <header class="top">
-  <div class="brand">Plow <span>Plymouth, MN</span></div>
-  <div class="live" id="live" aria-live="polite"><i class="pulse"></i><span id="liveText">Connecting&hellip;</span></div>
+  <div class="brand"><span class="word">PLOW</span><span class="place">Plymouth, Minnesota</span></div>
+  <nav class="nav">
+    <div class="live" id="live" aria-live="polite"><i class="pulse"></i><b id="liveState">Connecting</b><span id="liveText"></span></div>
+    <span class="vr" aria-hidden="true"></span>
+    <a href="#forecast" data-jump="forecast">Weather</a>
+    <a href="#about" data-jump="about">About</a>
+  </nav>
 </header>
 
 <div class="app">
-  <aside class="panel" aria-label="Plow dashboard">
+  <aside class="panel" id="panel" aria-label="Plow dashboard">
 
     <div id="alerts"></div>
     <div id="notice" class="notice" hidden></div>
 
-    <section class="tiles" aria-label="Fleet summary">
-      <div class="tile"><div class="tv" id="tMoving">&ndash;</div><div class="tl" id="tMovingLabel">trucks moving</div><div class="ts" id="tMovingSub"></div></div>
-      <div class="tile"><div class="tv" id="tSalting">&ndash;</div><div class="tl">salting now</div><div class="ts" id="tSaltingSub"></div></div>
-      <div class="tile"><div class="tv" id="tMiles">&ndash;</div><div class="tl" id="tMilesLabel">miles driven</div><div class="ts">snow fleet</div></div>
-      <div class="tile"><div class="tv" id="tTemp">&ndash;</div><div class="tl">road temp</div><div class="ts" id="tTempSub">from truck sensors</div></div>
+    <section class="sec" aria-labelledby="fleetH">
+      <h2 id="fleetH">Fleet now</h2>
+      <p class="subh">Live data from Plymouth Public Works</p>
+      <div class="stats">
+        <div class="stat"><div class="sv accent" id="sMoving">&ndash;</div><div class="sl" id="sMovingLabel">Trucks moving</div><div class="ss" id="sMovingSub">&nbsp;</div></div>
+        <div class="stat"><div class="sv" id="sSalting">&ndash;</div><div class="sl">Salting now</div><div class="ss" id="sSaltingSub">&nbsp;</div></div>
+        <div class="stat"><div class="sv" id="sMiles">&ndash;</div><div class="sl">Miles driven</div><div class="ss">since 12 AM</div></div>
+        <div class="stat"><div class="sv" id="sTemp">&ndash;</div><div class="sl">Road temp</div><div class="ss" id="sTempSub">(avg)</div></div>
+      </div>
     </section>
 
-    <section class="card" aria-labelledby="fcH">
+    <section class="sec" id="forecast" aria-labelledby="fcH">
       <h2 id="fcH">Snow forecast</h2>
-      <div class="snow">
-        <div><span class="sv" id="snow24">&ndash;</span><span class="sl">next 24 hrs</span></div>
-        <div><span class="sv" id="snow48">&ndash;</span><span class="sl">next 48 hrs</span></div>
-      </div>
-      <ol class="periods" id="periods"></ol>
-      <div class="src">National Weather Service &middot; <a href="https://forecast.weather.gov/MapClick.php?lat=45.0105&amp;lon=-93.4553" target="_blank" rel="noopener">full forecast</a></div>
+      <p class="subh">Plymouth, MN &middot; National Weather Service</p>
+      <table class="fc">
+        <thead><tr><th scope="col">Period</th><th scope="col">Snow</th><th scope="col">Temp</th><th scope="col">Wind</th></tr></thead>
+        <tbody id="fcTotals"><tr><td colspan="4" class="muted">Loading forecast&hellip;</td></tr></tbody>
+        <tbody id="fcPeriods"></tbody>
+      </table>
+      <p class="fine"><a href="https://forecast.weather.gov/MapClick.php?lat=45.0105&amp;lon=-93.4553" target="_blank" rel="noopener">Full NWS forecast</a></p>
     </section>
 
-    <section class="card" aria-labelledby="trH">
-      <div class="cardhead">
-        <h2 id="trH">Trucks</h2>
-        <div class="seg" role="group" aria-label="Which vehicles">
-          <button data-fleet="snow" aria-pressed="true">Snow fleet</button>
-          <button data-fleet="all" aria-pressed="false">All city</button>
-        </div>
+    <section class="sec" aria-labelledby="trH">
+      <h2 id="trH">Trucks</h2>
+      <div class="tabs" role="group" aria-label="Which vehicles">
+        <button data-fleet="snow" aria-pressed="true">Snow fleet <span id="cSnow"></span></button>
+        <button data-fleet="all" aria-pressed="false">All city vehicles <span id="cAll"></span></button>
       </div>
-      <ul class="trucks" id="trucks"></ul>
-      <p class="hint">Tap a truck to find it and highlight its route.</p>
+      <table class="tt">
+        <thead><tr><th scope="col">#</th><th scope="col">Status</th><th scope="col" class="num">Speed</th><th scope="col">Last report</th><th scope="col" class="num">Miles</th></tr></thead>
+        <tbody id="trucks"></tbody>
+      </table>
+      <p class="fine">Select a truck to find it on the map and highlight its route. Miles are for the selected time window.</p>
     </section>
 
-    <footer class="about">
-      <p>Live GPS from the City of Plymouth&rsquo;s public vehicle feed, refreshed every 5 seconds while this page is open. Trails show where trucks drove, not a guarantee a street is fully cleared. &ldquo;Salting&rdquo; means the spreader is reporting a non-zero rate.</p>
-      <p>Not affiliated with the city. For snow emergencies and parking rules see <a href="https://www.plymouthmn.gov/departments/public-works/streets/snow-removal" target="_blank" rel="noopener">plymouthmn.gov</a>.</p>
+    <footer class="source" id="about">
+      <p><b>Source:</b> City of Plymouth public vehicle feed (PreCise AVL), refreshed every 5 seconds while this page is open. Forecast and alerts from the National Weather Service.</p>
+      <p>Trails show where trucks drove, not a guarantee a street is fully cleared. &ldquo;Salting&rdquo; means the spreader reports a non-zero rate. This site is for information only and is not affiliated with the city &mdash; for snow emergencies and parking rules see <a href="https://www.plymouthmn.gov/departments/public-works/streets/snow-removal" target="_blank" rel="noopener">plymouthmn.gov</a>.</p>
     </footer>
   </aside>
 
   <main class="mapwrap">
     <div id="map" role="region" aria-label="Map of trucks and trails"></div>
+    <div class="chip" id="chip" aria-live="polite"></div>
     <div class="mapctl">
       <div class="seg" role="group" aria-label="Trail window">
         <button data-win="1" aria-pressed="false">1h</button>
@@ -67,7 +79,12 @@
         <button data-win="12" aria-pressed="false">12h</button>
         <button data-win="24" aria-pressed="false">24h</button>
       </div>
-      <button class="fit" id="fit" title="Zoom to all trucks">Fit</button>
+      <button class="btn" id="fit" title="Zoom to all trucks">Fit</button>
+    </div>
+    <div class="zoom">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">&minus;</button>
+      <button id="locate" aria-label="Show my location" title="Show my location"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="legend" id="legend" aria-label="Trail legend"></div>
     <div class="loading" id="loading" hidden>Loading trails&hellip;</div>
@@ -75,6 +92,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

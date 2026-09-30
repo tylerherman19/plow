@@ -9,6 +9,7 @@ var LIVE_LAYER = 5;   // Current Vehicle Location (every city vehicle reporting 
 var HIST_LAYER = 4;   // All Assets (~4 weeks of GPS breadcrumbs, queryable by time)
 var NWS_GRID = 'https://api.weather.gov/gridpoints/MPX/102,74';
 var NWS_ALERTS = 'https://api.weather.gov/alerts/active?point=45.0105,-93.4553';
+var HOME = [45.0205, -93.4553];
 
 var LIVE_MS = 5000;
 var HIST_MS = 30000;
@@ -17,6 +18,7 @@ var MOVING_MS = 3 * 60 * 1000;    // a speed reading older than this isn't "movi
 var ACTIVE_MS = 20 * 60 * 1000;   // no report for this long = parked
 var GAP_MS = 10 * 60 * 1000;      // break a trail across reporting gaps
 var JUMP_MI = 0.6;                // ...and across GPS jumps
+var SALT_DOT_MI = 0.08;           // spacing of salting dots along a trail
 var MAX_HOURS = 24;
 var PAGE = 5000, MAX_PAGES = 12;
 
@@ -29,14 +31,15 @@ var FLEET_LABEL = {
   'Utilities': 'Utilities'
 };
 
-/* trail age buckets: one blue ramp, newest darkest (light) / brightest (dark) */
+/* trail age buckets: one blue ramp, newest strongest */
 var BUCKETS = [
-  { h: 1,  label: 'Under 1 hr', light: '#104281', dark: '#cde2fb', op: 0.95 },
-  { h: 3,  label: '1–3 hrs',    light: '#2a78d6', dark: '#6da7ec', op: 0.85 },
-  { h: 12, label: '3–12 hrs',   light: '#6da7ec', dark: '#2a78d6', op: 0.75 },
-  { h: 24, label: '12–24 hrs',  light: '#86b6ef', dark: '#256abf', op: 0.65 }
+  { h: 1,  label: 'Recent (0–1h)', light: '#1a5fd0', dark: '#8fbdf7', w: 4,   op: 1 },
+  { h: 3,  label: '1–3h',          light: '#5f9cf0', dark: '#4f93ec', w: 3.5, op: 0.9 },
+  { h: 12, label: '3–12h',         light: '#97bff5', dark: '#2f6fc6', w: 3,   op: 0.85 },
+  { h: 24, label: '12–24h',        light: '#c3daf9', dark: '#23508f', w: 3,   op: 0.85 }
 ];
-var SALT = { light: '#eb6834', dark: '#d95926' };
+var SALT = { light: '#f07c1b', dark: '#f28a30' };
+var TRUCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M2 6.5A1.5 1.5 0 0 1 3.5 5h9A1.5 1.5 0 0 1 14 6.5V8h3.4a1.5 1.5 0 0 1 1.2.6l2.1 2.8a1.5 1.5 0 0 1 .3.9V15a1 1 0 0 1-1 1h-.6a2.5 2.5 0 0 0-4.8 0H9.4a2.5 2.5 0 0 0-4.8 0H3a1 1 0 0 1-1-1zM15 9.5V12h4.2l-1.6-2.1a1 1 0 0 0-.8-.4z"/><circle cx="7" cy="17" r="1.8" fill="#fff"/><circle cx="17" cy="17" r="1.8" fill="#fff"/></svg>';
 
 var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 var darkMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -45,7 +48,6 @@ function isDark() {
   if (t) return t === 'dark';
   return !!(darkMQ && darkMQ.matches);
 }
-
 function store(k, v) {
   try { if (v === undefined) return localStorage.getItem('plow.' + k); localStorage.setItem('plow.' + k, v); } catch (e) {}
   return null;
@@ -67,28 +69,28 @@ var forecast = null; // {s24, s48}
 
 /* ---------------- map ---------------- */
 var map = L.map('map', { zoomControl: false, preferCanvas: true });
-L.control.zoom({ position: 'bottomright' }).addTo(map);
 map.attributionControl.setPrefix(false);
-map.setView([45.0205, -93.4553], 12);
+map.setView(HOME, 12);
 
 var baseLayer = null, refLayer = null;
 function setTiles() {
-  var d = isDark() ? 'Dark' : 'Light';
   if (baseLayer) map.removeLayer(baseLayer);
-  if (refLayer) map.removeLayer(refLayer);
-  var u = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_' + d + '_Gray_';
-  baseLayer = L.tileLayer(u + 'Base/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19, maxNativeZoom: 16,
-    attribution: '&copy; Esri, OpenStreetMap | Data: City of Plymouth, NWS'
-  }).addTo(map);
-  refLayer = L.tileLayer(u + 'Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 16, pane: 'overlayPane' }).addTo(map);
-  refLayer.setZIndex(1);
+  if (refLayer) { map.removeLayer(refLayer); refLayer = null; }
+  var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+  var attr = '&copy; Esri, HERE, Garmin, OpenStreetMap contributors | Data: City of Plymouth, NWS';
+  if (isDark()) {
+    baseLayer = L.tileLayer(esri + 'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 16, attribution: attr }).addTo(map);
+    refLayer = L.tileLayer(esri + 'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 16 }).addTo(map);
+  } else {
+    baseLayer = L.tileLayer(esri + 'World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: attr }).addTo(map);
+  }
 }
 setTiles();
 
 var canvas = L.canvas({ padding: 0.5 });
 var trailLayer = L.layerGroup().addTo(map);
 var markerLayer = L.layerGroup().addTo(map);
+var meMarker = null;
 setTimeout(function () { map.invalidateSize(); }, 100);
 
 /* ---------------- JSONP (reliable regardless of the city's CORS config) ---------------- */
@@ -124,20 +126,23 @@ function sqlTime(ms) { // feed stores UTC
 }
 
 /* ---------------- helpers ---------------- */
+var $ = function (id) { return document.getElementById(id); };
 function num(v) { return v == null || isNaN(v) ? null : +v; }
 function spreading(a) { return (num(a.GranularSetting) || 0) > 0 || (num(a.PrewetSetting) || 0) > 0 || (num(a.DirectSetting) || 0) > 0; }
 function isSnow(fleetName) { return !!SNOW_FLEETS[fleetName]; }
-function inFilter(v) { return fleet === 'all' || isSnow(v.fleet); }
+function inFilter(v, f) { return (f || fleet) === 'all' || isSnow(v.fleet); }
 function fleetLabel(f) { return FLEET_LABEL[f] || f || 'Vehicle'; }
 function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
-function compass(deg) { return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
+function same(a, b) { return a != null && b != null && String(a) === String(b); }
+function midnight() { var d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function shortName(v) { return v.name.split(/\s+/)[0] || v.name; }
 function ago(ms) {
   var s = Math.max(0, Math.round(ms / 1000));
-  if (s < 45) return 'just now';
+  if (s < 60) return s + ' sec ago';
   var m = Math.round(s / 60);
   if (m < 60) return m + ' min ago';
   var h = Math.floor(m / 60), r = m % 60;
-  if (h < 24) return h + ' hr' + (r && h < 6 ? ' ' + r + ' min' : '') + ' ago';
+  if (h < 24) return h + ' hr' + (r && h < 3 ? ' ' + r + ' min' : '') + ' ago';
   var d = Math.round(h / 24);
   return d + ' day' + (d === 1 ? '' : 's') + ' ago';
 }
@@ -148,6 +153,7 @@ function miles(a, b) {
           Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
   return 2 * R * Math.asin(Math.sqrt(s));
 }
+function fmtMi(x) { return x >= 100 ? String(Math.round(x)) : x.toFixed(1); }
 function nameSort(a, b) {
   var x = parseInt(a.name, 10), y = parseInt(b.name, 10);
   if (!isNaN(x) && !isNaN(y) && x !== y) return x - y;
@@ -156,7 +162,7 @@ function nameSort(a, b) {
 function ensureVehicle(a) {
   var id = a.AssetID;
   var v = vehicles[id];
-  if (!v) v = vehicles[id] = { id: id, name: '', fleet: '', t: 0, live: false, marker: null, miles: 0 };
+  if (!v) v = vehicles[id] = { id: id, name: '', fleet: '', t: 0, live: false, marker: null, miles: 0, today: 0 };
   if (a.AssetName) v.name = String(a.AssetName).trim();
   if (a.FleetName) v.fleet = a.FleetName;
   return v;
@@ -164,8 +170,19 @@ function ensureVehicle(a) {
 function status(v, now) {
   if (!v.live || now - v.t > ACTIVE_MS) return 'parked';
   if ((v.speed || 0) > 0 && now - v.t < MOVING_MS) return 'moving';
-  return 'stopped';
+  return 'idle';
 }
+/* call fn(prev, p, dist) for every drawable leg at or after cut */
+function eachLeg(pts, cut, fn, onBreak) {
+  for (var i = 1; i < pts.length; i++) {
+    var p = pts[i], prev = pts[i - 1];
+    if (prev.t < cut) continue;
+    var d = miles(prev, p);
+    if (p.t - prev.t > GAP_MS || d > JUMP_MI) { if (onBreak) onBreak(); continue; }
+    fn(prev, p, d);
+  }
+}
+function milesSince(pts, cut) { var m = 0; eachLeg(pts, cut, function (a, b, d) { m += d; }); return m; }
 
 /* ---------------- live positions ---------------- */
 function pollLive() {
@@ -193,7 +210,7 @@ function pollLive() {
       v.tLat = a.Latitude; v.tLng = a.Longitude;
     });
     Object.keys(vehicles).forEach(function (k) { if (!seen[k]) vehicles[k].live = false; });
-    renderMarkers(); renderSummary(); renderList(); renderLive();
+    renderMarkers(); renderSummary(); renderList(); renderLive(); renderNotice();
   }).catch(function () {
     liveErr = true; renderLive(); renderNotice();
   });
@@ -202,7 +219,6 @@ function pollLive() {
 /* ---------------- history (trails) ---------------- */
 function fetchRange(from, to) {
   var where = 'RecordDateTime >= ' + sqlTime(from) + (to ? ' AND RecordDateTime < ' + sqlTime(to) : '');
-  var got = 0;
   function page(n) {
     return query(HIST_LAYER, {
       where: where,
@@ -212,15 +228,14 @@ function fetchRange(from, to) {
       resultRecordCount: String(PAGE)
     }).then(function (d) {
       var feats = d.features || [];
-      got += ingest(feats);
+      ingest(feats);
       if (d.exceededTransferLimit && feats.length && n + 1 < MAX_PAGES) return page(n + 1);
-      return got;
     });
   }
   return page(0);
 }
 function ingest(feats) {
-  var touched = {}, n = 0;
+  var touched = {};
   feats.forEach(function (f) {
     var a = f.attributes || {};
     if (seenIds[a.OBJECTID] || a.AssetID == null || a.Latitude == null || a.RecordDateTime == null) return;
@@ -230,10 +245,8 @@ function ingest(feats) {
     (tracks[a.AssetID] = tracks[a.AssetID] || []).push({ id: a.OBJECTID, t: a.RecordDateTime, lat: a.Latitude, lng: a.Longitude, s: spreading(a) });
     touched[a.AssetID] = true;
     if (a.RecordDateTime > histMax) histMax = a.RecordDateTime;
-    n++;
   });
   Object.keys(touched).forEach(function (k) { tracks[k].sort(function (x, y) { return x.t - y.t; }); });
-  return n;
 }
 function prune() {
   var cut = Date.now() - MAX_HOURS * 3600e3 - 5 * 60e3;
@@ -246,7 +259,7 @@ function prune() {
 }
 function pollHistory() {
   if (histBusy) return Promise.resolve();
-  var now = Date.now(), want = now - win * 3600e3, jobs = [];
+  var now = Date.now(), want = Math.min(now - win * 3600e3, midnight()), jobs = [];
   histBusy = true;
   if (!loadedFrom) {
     jobs.push(fetchRange(want));
@@ -254,13 +267,13 @@ function pollHistory() {
     if (want < loadedFrom) jobs.push(fetchRange(want, loadedFrom));
     jobs.push(fetchRange(Math.max(histMax, now - 3600e3) - 60e3)); // small overlap; OBJECTID dedupes
   }
-  var slow = setTimeout(function () { loadingEl.hidden = false; }, 400);
+  var slow = setTimeout(function () { $('loading').hidden = false; }, 400);
   return Promise.all(jobs).then(function () {
     loadedFrom = loadedFrom ? Math.min(loadedFrom, want) : want;
     prune();
   }).catch(function () { /* trails are best-effort; live dots matter more */ })
     .then(function () {
-      clearTimeout(slow); loadingEl.hidden = true; histBusy = false;
+      clearTimeout(slow); $('loading').hidden = true; histBusy = false;
       renderTrails(); renderSummary(); renderList(); renderNotice();
     });
 }
@@ -271,72 +284,72 @@ function bucketOf(ageMs) {
 }
 function renderTrails() {
   trailLayer.clearLayers();
-  var now = Date.now(), cut = now - win * 3600e3, dark = isDark();
+  var now = Date.now(), cut = now - win * 3600e3, today = midnight(), dark = isDark();
   var byBucket = BUCKETS.map(function () { return []; });
-  var salt = [], selLines = [], selSalt = [];
+  var dots = [], selLines = [], selDots = [];
   Object.keys(tracks).forEach(function (k) {
-    var v = vehicles[k], pts = tracks[k], total = 0;
-    var mine = String(k) === String(selected);
-    var draw = mine || !v || inFilter(v); // miles still count for filtered-out fleets
-    var run = null, srun = null;
+    var v = vehicles[k], pts = tracks[k];
+    if (v) v.today = milesSince(pts, today);
+    var mine = same(k, selected);
+    var draw = mine || !v || inFilter(v);
+    var run = null, total = 0, sinceDot = Infinity;
     function endRun() { if (draw && run && run.pts.length > 1) (mine ? selLines : byBucket[run.b]).push(run.pts); run = null; }
-    function endSalt() { if (draw && srun && srun.length > 1) (mine ? selSalt : salt).push(srun); srun = null; }
-    for (var i = 0; i < pts.length; i++) {
-      var p = pts[i];
-      if (p.t < cut) continue;
-      var prev = i > 0 && pts[i - 1].t >= cut ? pts[i - 1] : null;
-      if (!prev || p.t - prev.t > GAP_MS) { endRun(); endSalt(); continue; }
-      var d = miles(prev, p);
-      if (d > JUMP_MI) { endRun(); endSalt(); continue; }
+    eachLeg(pts, cut, function (prev, p, d) {
       total += d;
+      if (!draw) return;
       var b = bucketOf(now - p.t);
       if (!run || run.b !== b) { endRun(); run = { b: b, pts: [[prev.lat, prev.lng]] }; }
       run.pts.push([p.lat, p.lng]);
-      if (p.s) { if (!srun) srun = [[prev.lat, prev.lng]]; srun.push([p.lat, p.lng]); }
-      else endSalt();
-    }
-    endRun(); endSalt();
+      sinceDot += d;
+      if (p.s && sinceDot >= SALT_DOT_MI) { (mine ? selDots : dots).push([p.lat, p.lng]); sinceDot = 0; }
+    }, endRun);
+    endRun();
     if (v) v.miles = total;
   });
-  var dim = selected != null;
+  var dim = selected != null ? 0.35 : 1;
+  var line = function (pts, color, w, op) {
+    L.polyline(pts, { renderer: canvas, interactive: false, color: color, weight: w, opacity: op, lineCap: 'round', lineJoin: 'round' }).addTo(trailLayer);
+  };
+  var dot = function (ll, op) {
+    L.circleMarker(ll, { renderer: canvas, interactive: false, radius: 4.5, color: '#fff', weight: 1.5, fillColor: dark ? SALT.dark : SALT.light, fillOpacity: op, opacity: op }).addTo(trailLayer);
+  };
   for (var b = BUCKETS.length - 1; b >= 0; b--) {
-    if (byBucket[b].length) L.polyline(byBucket[b], {
-      renderer: canvas, interactive: false, color: dark ? BUCKETS[b].dark : BUCKETS[b].light,
-      weight: 3, opacity: BUCKETS[b].op * (dim ? 0.35 : 1), lineCap: 'round', lineJoin: 'round'
-    }).addTo(trailLayer);
+    if (byBucket[b].length) line(byBucket[b], dark ? BUCKETS[b].dark : BUCKETS[b].light, BUCKETS[b].w, BUCKETS[b].op * dim);
   }
-  if (salt.length) L.polyline(salt, { renderer: canvas, interactive: false, color: dark ? SALT.dark : SALT.light, weight: 2, opacity: dim ? 0.35 : 0.95 }).addTo(trailLayer);
+  dots.forEach(function (ll) { dot(ll, dim); });
   if (selLines.length) {
-    L.polyline(selLines, { renderer: canvas, interactive: false, color: dark ? '#ffffff' : '#0b0b0b', weight: 7, opacity: 0.25, lineCap: 'round', lineJoin: 'round' }).addTo(trailLayer);
-    L.polyline(selLines, { renderer: canvas, interactive: false, color: dark ? BUCKETS[0].dark : BUCKETS[0].light, weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(trailLayer);
+    line(selLines, dark ? '#0b0d10' : '#ffffff', 9, 0.9);
+    line(selLines, dark ? BUCKETS[0].dark : BUCKETS[0].light, 5, 1);
   }
-  if (selSalt.length) L.polyline(selSalt, { renderer: canvas, interactive: false, color: dark ? SALT.dark : SALT.light, weight: 2.5, opacity: 1 }).addTo(trailLayer);
-  renderLegend();
+  selDots.forEach(function (ll) { dot(ll, 1); });
+  renderLegend(); renderChip();
 }
 
 /* ---------------- markers ---------------- */
-function iconFor(v, st) {
-  var cls = 'tk ' + st + (v.salting && st !== 'parked' ? ' salting' : '') + (String(v.id) === String(selected) ? ' sel' : '');
-  var arrow = st === 'moving' && v.heading != null ? '<div class="arrow" style="transform:rotate(' + Math.round(v.heading) + 'deg)"></div>' : '';
-  var sig = cls + '|' + (arrow ? Math.round(v.heading / 10) : '') + '|' + v.name;
-  return { sig: sig, icon: L.divIcon({ className: '', iconSize: [28, 28], iconAnchor: [14, 14],
-    html: '<div class="' + cls + '">' + arrow + '<div class="body"></div><div class="lab">' + esc(v.name) + '</div></div>' }) };
+function markerClass(v, st) {
+  var c = 'tk ' + st;
+  if (v.salting && st === 'moving') c += ' msalt';
+  if (v.salting && st === 'idle') c += ' stsalt';
+  if (same(v.id, selected)) c += ' sel';
+  return c;
 }
 function renderMarkers() {
   var now = Date.now();
   Object.keys(vehicles).forEach(function (k) {
     var v = vehicles[k], st = status(v, now);
-    var show = v.lat != null && inFilter(v) && (st !== 'parked' || String(k) === String(selected));
+    var show = v.lat != null && inFilter(v) && (st !== 'parked' || same(k, selected));
     if (!show) { if (v.marker) { markerLayer.removeLayer(v.marker); v.marker = null; } return; }
-    var ic = iconFor(v, st);
-    if (!v.marker) {
-      v.marker = L.marker([v.lat, v.lng], { icon: ic.icon, keyboard: false, title: fleetLabel(v.fleet) + ' ' + v.name }).addTo(markerLayer);
-      v.marker.on('click', function () { select(v.id, false); });
-      v.sig = ic.sig;
-    } else if (v.sig !== ic.sig) {
-      v.marker.setIcon(ic.icon); v.sig = ic.sig;
+    var cls = markerClass(v, st), sig = cls + '|' + v.name;
+    if (!v.marker || v.sig !== sig) {
+      var icon = L.divIcon({ className: '', iconSize: [32, 32], iconAnchor: [16, 16],
+        html: '<div class="' + cls + '"><div class="body">' + TRUCK_SVG + '</div><div class="lab">' + esc(shortName(v)) + '</div></div>' });
+      if (!v.marker) {
+        v.marker = L.marker([v.lat, v.lng], { icon: icon, keyboard: false, title: fleetLabel(v.fleet) + ' ' + v.name }).addTo(markerLayer);
+        v.marker.on('click', function () { select(v.id, false); });
+      } else v.marker.setIcon(icon);
+      v.sig = sig;
     }
-    if (st === 'moving') v.marker.setZIndexOffset(500); else v.marker.setZIndexOffset(0);
+    v.marker.setZIndexOffset(st === 'moving' ? 500 : 0);
   });
 }
 function glide() {
@@ -354,132 +367,147 @@ function glide() {
 }
 
 /* ---------------- panel ---------------- */
-var $ = function (id) { return document.getElementById(id); };
-var loadingEl = $('loading');
-
 function renderLive() {
-  var el = $('live'), txt = $('liveText');
-  if (document.hidden) { el.className = 'live'; txt.textContent = 'Paused'; return; }
-  if (liveErr) { el.className = 'live err'; txt.textContent = liveOk ? 'Feed unreachable · retrying' : 'Can’t reach the city feed · retrying'; return; }
-  if (!liveOk) { el.className = 'live'; txt.textContent = 'Connecting…'; return; }
-  el.className = 'live ok';
-  var s = Math.round((Date.now() - liveOk) / 1000);
-  txt.textContent = 'Live · updated ' + (s < 2 ? 'now' : s + 's ago');
+  var el = $('live'), state = $('liveState'), txt = $('liveText');
+  if (document.hidden) { el.className = 'live'; state.textContent = 'Paused'; txt.textContent = ''; return; }
+  if (liveErr) { el.className = 'live err'; state.textContent = 'Offline'; txt.textContent = 'retrying'; return; }
+  if (!liveOk) { el.className = 'live'; state.textContent = 'Connecting'; txt.textContent = ''; return; }
+  el.className = 'live ok'; state.textContent = 'Live';
+  txt.textContent = 'updated ' + ago(Date.now() - liveOk);
+}
+
+function listRows(f, now) {
+  var cut = now - win * 3600e3;
+  return Object.keys(vehicles).map(function (k) { return vehicles[k]; }).filter(function (v) {
+    if (!inFilter(v, f) || !v.name) return false;
+    return (v.live && now - v.t < ACTIVE_MS) || v.t >= cut || same(v.id, selected);
+  });
 }
 
 function renderSummary() {
-  var now = Date.now(), moving = 0, active = 0, salting = 0, mat = {}, temps = [], air = [], mi = 0;
+  var now = Date.now(), moving = 0, salting = 0, mat = {}, temps = [], today = 0, total = 0;
   Object.keys(vehicles).forEach(function (k) {
     var v = vehicles[k];
     if (!isSnow(v.fleet)) return;
-    mi += v.miles || 0;
+    today += v.today || 0;
     var st = status(v, now);
+    if (st !== 'parked' || v.t >= midnight()) total++;
     if (st === 'parked') return;
-    active++;
     if (st === 'moving') moving++;
     if (v.salting) { salting++; if (v.material) mat[v.material.toLowerCase()] = 1; }
     if (v.roadTemp != null) temps.push(v.roadTemp);
-    if (v.airTemp != null) air.push(v.airTemp);
   });
-  $('tMoving').textContent = liveOk ? moving : '–';
-  $('tMovingLabel').textContent = moving === 1 ? 'truck moving' : 'trucks moving';
-  $('tMovingSub').textContent = liveOk ? (active ? active + ' on the road' : 'none on the road') : '';
-  $('tSalting').textContent = liveOk ? salting : '–';
+  $('sMoving').textContent = liveOk ? moving : '–';
+  $('sMovingLabel').textContent = moving === 1 ? 'Truck moving' : 'Trucks moving';
+  $('sMovingSub').textContent = liveOk ? 'of ' + total + ' today' : ' ';
+  $('sSalting').textContent = liveOk ? salting : '–';
   var m = Object.keys(mat);
-  $('tSaltingSub').textContent = salting ? (m.length ? m.join(', ') : '') : (liveOk ? 'no spreaders running' : '');
-  $('tMiles').textContent = loadedFrom ? (mi >= 100 ? Math.round(mi) : mi.toFixed(1)) : '–';
-  $('tMilesLabel').textContent = 'miles in last ' + win + ' hr' + (win === 1 ? '' : 's');
-  var avg = function (xs) { return Math.round(xs.reduce(function (x, y) { return x + y; }, 0) / xs.length); };
+  $('sSaltingSub').textContent = salting ? (m.length ? m.join(', ') : 'spreading') : (liveOk ? 'none now' : ' ');
+  $('sMiles').textContent = loadedFrom ? fmtMi(today) : '–';
   if (temps.length) {
-    $('tTemp').innerHTML = avg(temps) + '<small>°F</small>';
-    $('tTempSub').textContent = (air.length ? 'air ' + avg(air) + '°F · ' : '') + temps.length + ' truck sensor' + (temps.length === 1 ? '' : 's');
+    $('sTemp').textContent = Math.round(temps.reduce(function (x, y) { return x + y; }, 0) / temps.length) + '°F';
+    $('sTempSub').textContent = '(avg of ' + temps.length + ')';
   } else {
-    $('tTemp').textContent = '–';
-    $('tTempSub').textContent = 'no truck sensors reporting';
+    $('sTemp').textContent = '–';
+    $('sTempSub').textContent = 'no sensor data';
   }
 }
 
+function statusCell(v, st) {
+  if (st === 'moving') return v.salting ? '<span class="st moving salt">Moving + Salting</span>' : '<span class="st moving">Moving</span>';
+  if (st === 'idle') return v.salting ? '<span class="st stsalt salt">Salting (stopped)</span>' : '<span class="st idle">Idle</span>';
+  return '<span class="st parked">Parked</span>';
+}
 function renderList() {
-  var now = Date.now(), cut = now - win * 3600e3;
-  var rows = Object.keys(vehicles).map(function (k) { return vehicles[k]; }).filter(function (v) {
-    if (!inFilter(v) || !v.name) return false;
-    return (v.live && now - v.t < ACTIVE_MS) || v.t >= cut || String(v.id) === String(selected);
-  });
-  var rank = { moving: 0, stopped: 1, parked: 2 };
-  rows.sort(function (a, b) {
-    var d = rank[status(a, now)] - rank[status(b, now)];
-    return d || nameSort(a, b);
-  });
-  var ul = $('trucks');
+  var now = Date.now();
+  var rows = listRows(fleet, now);
+  $('cSnow').textContent = '(' + listRows('snow', now).length + ')';
+  $('cAll').textContent = '(' + listRows('all', now).length + ')';
+  var rank = { moving: 0, idle: 1, parked: 2 };
+  rows.sort(function (a, b) { return rank[status(a, now)] - rank[status(b, now)] || nameSort(a, b); });
+  var tb = $('trucks');
   if (!rows.length) {
-    ul.innerHTML = '<li class="empty">' + (liveOk || loadedFrom ? 'No ' + (fleet === 'snow' ? 'snow trucks' : 'city vehicles') + ' out in the last ' + win + ' hr' + (win === 1 ? '' : 's') + '.' : 'Loading…') + '</li>';
+    tb.innerHTML = '<tr class="empty"><td colspan="5">' + (liveOk || loadedFrom ? 'No ' + (fleet === 'snow' ? 'snow trucks' : 'city vehicles') + ' out in the last ' + win + ' hr' + (win === 1 ? '' : 's') + '.' : 'Loading…') + '</td></tr>';
     return;
   }
-  ul.innerHTML = rows.map(function (v) {
-    var st = status(v, now), sub;
-    if (st === 'moving') sub = 'Moving ' + Math.round(v.speed) + ' mph' + (v.heading != null ? ' ' + compass(v.heading) : '');
-    else if (st === 'stopped') sub = 'Stopped · reported ' + ago(now - v.t);
-    else sub = 'Parked · last seen ' + ago(now - v.t);
-    var chip = v.salting && st !== 'parked' ? '<span class="chip">Salting</span>' : '';
-    var mi = v.miles ? '<b>' + (v.miles >= 10 ? Math.round(v.miles) : v.miles.toFixed(1)) + '</b> mi' : '';
-    return '<li' + (String(v.id) === String(selected) ? ' class="sel"' : '') + '><button data-id="' + esc(v.id) + '" aria-pressed="' + (String(v.id) === String(selected)) + '">' +
-      '<span class="dot ' + st + '" aria-hidden="true"></span>' +
-      '<span><span class="tn">' + esc(v.name) + '</span><span class="tf">' + esc(fleetLabel(v.fleet)) + '</span>' + chip +
-      '<br><span class="tsub">' + sub + '</span></span>' +
-      '<span class="tr">' + mi + '</span></button></li>';
+  tb.innerHTML = rows.map(function (v) {
+    var st = status(v, now), sn = shortName(v), extra = v.name.slice(sn.length).trim();
+    var sub = extra || (fleet === 'all' || !isSnow(v.fleet) || v.fleet !== 'City of Plymouth Streets' ? fleetLabel(v.fleet) : '');
+    return '<tr tabindex="0" data-id="' + esc(v.id) + '"' + (same(v.id, selected) ? ' class="sel" aria-selected="true"' : '') + ' title="' + esc(fleetLabel(v.fleet) + ' · ' + v.name) + '">' +
+      '<td>' + esc(sn) + (sub ? '<span class="nm">' + esc(sub) + '</span>' : '') + '</td>' +
+      '<td>' + statusCell(v, st) + '</td>' +
+      '<td class="num">' + (st === 'parked' ? '–' : (st === 'moving' ? Math.round(v.speed || 0) : 0) + ' mph') + '</td>' +
+      '<td>' + ago(now - v.t) + '</td>' +
+      '<td class="num">' + (v.miles || 0).toFixed(1) + '</td></tr>';
   }).join('');
+}
+
+function renderChip() {
+  var now = Date.now(), cut = now - win * 3600e3, mi = 0, n = 0;
+  Object.keys(vehicles).forEach(function (k) {
+    var v = vehicles[k];
+    if (!inFilter(v)) return;
+    mi += v.miles || 0;
+    if (v.miles > 0 || (v.live && status(v, now) !== 'parked')) n++;
+  });
+  $('chip').innerHTML = loadedFrom ? '<b>' + win + 'h activity</b> · ' + fmtMi(mi) + ' mi tracked · ' + n + ' vehicle' + (n === 1 ? '' : 's') : '';
 }
 
 function renderNotice() {
   var el = $('notice'), msg = '', err = false;
   if (liveErr && !liveOk) { msg = 'Can’t reach the City of Plymouth’s vehicle feed right now. It will keep retrying.'; err = true; }
-  else if (forecast && forecast.s48 === 0 && !anySaltInWindow()) {
+  else if (forecast && forecast.s48 === 0 && !anySaltToday()) {
     msg = 'No snow in the forecast. Trucks on the map are doing regular street work, not plowing.';
   }
   el.hidden = !msg; el.textContent = msg; el.className = 'notice' + (err ? ' err' : '');
 }
-function anySaltInWindow() {
-  var cut = Date.now() - win * 3600e3;
+function anySaltToday() {
+  var cut = Date.now() - MAX_HOURS * 3600e3;
   return Object.keys(tracks).some(function (k) {
     return tracks[k].some(function (p) { return p.s && p.t >= cut; });
   }) || Object.keys(vehicles).some(function (k) { return vehicles[k].salting && vehicles[k].live; });
 }
 
 function renderLegend() {
-  var dark = isDark(), html = '<div class="lt">Trail age</div>';
+  var dark = isDark(), html = '';
   BUCKETS.forEach(function (b, i) {
     if (i > 0 && BUCKETS[i - 1].h >= win) return;
     html += '<div class="row"><span class="sw" style="background:' + (dark ? b.dark : b.light) + '"></span>' + b.label + '</div>';
   });
-  html += '<div class="row"><span class="sw" style="background:' + (dark ? SALT.dark : SALT.light) + '"></span>Salting</div>';
+  html += '<div class="row"><span class="dt"></span>Salting</div>';
   $('legend').innerHTML = html;
 }
 
 /* ---------------- selection & controls ---------------- */
 function select(id, fly) {
-  selected = selected != null && String(selected) === String(id) ? null : id;
+  selected = same(selected, id) ? null : id;
   renderMarkers(); renderTrails(); renderList();
   var v = selected != null ? vehicles[selected] : null;
   if (!v) return;
   if (fly !== false && v.lat != null) map.flyTo([v.lat, v.lng], Math.max(map.getZoom(), 15), { animate: !reduceMotion, duration: 0.8 });
   if (fly === false) {
-    var row = document.querySelector('.trucks li.sel');
+    var row = document.querySelector('#trucks tr.sel');
     if (row && row.scrollIntoView && window.innerWidth > 760) row.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 }
 $('trucks').addEventListener('click', function (e) {
-  var b = e.target.closest('button[data-id]');
-  if (b) select(b.getAttribute('data-id'), true);
+  var r = e.target.closest('tr[data-id]');
+  if (r) select(r.getAttribute('data-id'), true);
+});
+$('trucks').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var r = e.target.closest('tr[data-id]');
+  if (r) { e.preventDefault(); select(r.getAttribute('data-id'), true); }
 });
 map.on('click', function () { if (selected != null) select(selected); });
 
-function pressed(group, attr, val) {
-  document.querySelectorAll(group + ' button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === String(val))); });
+function pressed(sel, attr, val) {
+  document.querySelectorAll(sel).forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === String(val))); });
 }
 document.querySelectorAll('[data-fleet]').forEach(function (b) {
   b.addEventListener('click', function () {
     fleet = b.getAttribute('data-fleet'); store('fleet', fleet);
-    pressed('.cardhead .seg', 'data-fleet', fleet);
+    pressed('[data-fleet]', 'data-fleet', fleet);
     if (selected != null && vehicles[selected] && !inFilter(vehicles[selected])) selected = null;
     renderMarkers(); renderTrails(); renderList();
   });
@@ -487,10 +515,29 @@ document.querySelectorAll('[data-fleet]').forEach(function (b) {
 document.querySelectorAll('[data-win]').forEach(function (b) {
   b.addEventListener('click', function () {
     win = +b.getAttribute('data-win'); store('win', win);
-    pressed('.mapctl .seg', 'data-win', win);
-    renderTrails(); renderSummary(); renderList(); renderNotice();
+    pressed('[data-win]', 'data-win', win);
+    renderTrails(); renderList();
     if (Date.now() - win * 3600e3 < loadedFrom) pollHistory();
   });
+});
+document.querySelectorAll('[data-jump]').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    var t = $(a.getAttribute('data-jump'));
+    if (!t) return;
+    e.preventDefault();
+    t.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
+});
+$('zin').addEventListener('click', function () { map.zoomIn(); });
+$('zout').addEventListener('click', function () { map.zoomOut(); });
+$('locate').addEventListener('click', function () {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(function (pos) {
+    var ll = [pos.coords.latitude, pos.coords.longitude];
+    if (!meMarker) meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }), keyboard: false, interactive: false }).addTo(map);
+    else meMarker.setLatLng(ll);
+    map.flyTo(ll, Math.max(map.getZoom(), 15), { animate: !reduceMotion });
+  }, function () { $('locate').title = 'Location unavailable'; }, { enableHighAccuracy: true, timeout: 10000 });
 });
 $('fit').addEventListener('click', function () {
   var now = Date.now(), pts = [];
@@ -506,10 +553,10 @@ $('fit').addEventListener('click', function () {
     });
   }
   if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom: 15, animate: !reduceMotion });
-  else map.setView([45.0205, -93.4553], 12);
+  else map.setView(HOME, 12);
 });
-pressed('.cardhead .seg', 'data-fleet', fleet);
-pressed('.mapctl .seg', 'data-win', win);
+pressed('[data-fleet]', 'data-fleet', fleet);
+pressed('[data-win]', 'data-win', win);
 
 /* ---------------- weather (NWS, free, no key) ---------------- */
 function nws(url) {
@@ -523,41 +570,92 @@ function isoDurMs(s) {
   if (!m) return 3600e3;
   return ((+m[1] || 0) * 24 + (+m[2] || 0)) * 3600e3 + (+m[3] || 0) * 60e3;
 }
-function snowInches(values, fromMs, toMs) {
-  var mm = 0;
-  (values || []).forEach(function (v) {
-    var parts = String(v.validTime).split('/');
-    var s = Date.parse(parts[0]), e = s + isoDurMs(parts[1]);
-    var overlap = Math.min(e, toMs) - Math.max(s, fromMs);
-    if (overlap > 0 && e > s) mm += (v.value || 0) * overlap / (e - s);
+function spans(values) {
+  return (values || []).map(function (v) {
+    var parts = String(v.validTime).split('/'), s = Date.parse(parts[0]);
+    return { s: s, e: s + isoDurMs(parts[1]), v: v.value };
   });
-  return mm / 25.4;
 }
-function fmtIn(x) {
-  if (x == null) return '–';
-  if (x < 0.05) return x > 0.005 ? 'Trace' : '0 in';
-  return (x < 10 ? x.toFixed(1) : Math.round(x)) + ' in';
+function sumOver(sp, from, to) { // accumulations (snow): prorate by overlap
+  var t = 0;
+  sp.forEach(function (x) {
+    var o = Math.min(x.e, to) - Math.max(x.s, from);
+    if (o > 0 && x.e > x.s) t += (x.v || 0) * o / (x.e - x.s);
+  });
+  return t;
+}
+function rangeOver(sp, from, to) { // instantaneous values (temp, wind): min/max
+  var lo = Infinity, hi = -Infinity;
+  sp.forEach(function (x) {
+    if (x.v == null || x.e <= from || x.s >= to) return;
+    lo = Math.min(lo, x.v); hi = Math.max(hi, x.v);
+  });
+  return lo === Infinity ? null : [lo, hi];
+}
+function modeDir(sp, from, to) {
+  var c = {}, best = null;
+  sp.forEach(function (x) {
+    if (x.v == null || x.e <= from || x.s >= to) return;
+    var d = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((x.v % 360) + 360) % 360 / 45) % 8];
+    c[d] = (c[d] || 0) + Math.min(x.e, to) - Math.max(x.s, from);
+    if (!best || c[d] > c[best]) best = d;
+  });
+  return best;
+}
+var cToF = function (c) { return c * 9 / 5 + 32; };
+var kmhToMph = function (k) { return k / 1.609344; };
+function fmtRange(r, conv, unit) {
+  if (!r) return '–';
+  var a = Math.round(conv(r[0])), b = Math.round(conv(r[1]));
+  return (a === b ? a : a + '–' + b) + unit;
+}
+function fmtSnow(inches) {
+  if (inches == null) return '–';
+  if (inches < 0.05) return inches > 0.005 ? 'Trace' : '0"';
+  return (inches < 10 ? inches.toFixed(1) : Math.round(inches)) + '"';
+}
+var WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+function wordNum(w) { return WORDS[String(w).toLowerCase()] || +w; }
+function periodSnow(text) { // NWS writes e.g. "New snow accumulation of 1 to 3 inches possible."
+  var t = text || '', m;
+  if ((m = /accumulations? of (\w+) to (\w+) inch/i.exec(t))) return wordNum(m[1]) + '–' + wordNum(m[2]) + '"';
+  if ((m = /accumulations? of less than (one|a half|half an?) inch/i.exec(t))) return /one/i.test(m[1]) ? '< 1"' : '< ½"';
+  if ((m = /accumulations? of (?:around|about) (\w+) inch/i.exec(t))) return '~' + wordNum(m[1]) + '"';
+  return null;
 }
 function checkWeather() {
-  nws(NWS_GRID).then(function (d) {
-    var vals = ((d.properties || {}).snowfallAmount || {}).values || [];
-    var now = Date.now();
-    var s24 = snowInches(vals, now, now + 24 * 3600e3), s48 = snowInches(vals, now, now + 48 * 3600e3);
-    forecast = { s24: s24 < 0.005 ? 0 : s24, s48: s48 < 0.005 ? 0 : s48 };
-    $('snow24').textContent = fmtIn(forecast.s24);
-    $('snow48').textContent = fmtIn(forecast.s48);
-    renderNotice();
-  }).catch(function () { $('snow24').textContent = $('snow48').textContent = 'n/a'; });
+  var gridP = nws(NWS_GRID).then(function (d) { return d.properties || {}; });
+  var fcP = nws(NWS_GRID + '/forecast').then(function (d) { return (d.properties || {}).periods || []; });
 
-  nws(NWS_GRID + '/forecast').then(function (d) {
-    var ps = ((d.properties || {}).periods || []).slice(0, 4);
-    $('periods').innerHTML = ps.map(function (p) {
-      var snowy = /snow|flurr|sleet|freezing|wintry|blizzard/i.test(p.shortForecast || '');
-      var pop = p.probabilityOfPrecipitation && p.probabilityOfPrecipitation.value;
-      return '<li><span class="pn">' + esc(p.name) + '</span><span class="pt">' + esc(p.temperature) + '°</span>' +
-        '<span class="pf' + (snowy ? ' snowy' : '') + '">' + esc(p.shortForecast) + (pop ? ' · ' + pop + '%' : '') + '</span></li>';
-    }).join('');
-  }).catch(function () { $('periods').innerHTML = '<li><span class="pf">Forecast unavailable right now.</span></li>'; });
+  gridP.then(function (p) {
+    var snow = spans((p.snowfallAmount || {}).values), temp = spans((p.temperature || {}).values);
+    var wind = spans((p.windSpeed || {}).values), dir = spans((p.windDirection || {}).values);
+    var now = Date.now();
+    var row = function (label, hrs) {
+      var to = now + hrs * 3600e3, s = sumOver(snow, now, to) / 25.4;
+      var dd = modeDir(dir, now, to);
+      return { s: s < 0.005 ? 0 : s, html: '<tr><td>' + label + '</td><td' + (s >= 0.05 ? ' class="snowy"' : '') + '>' + fmtSnow(s) + '</td><td>' +
+        fmtRange(rangeOver(temp, now, to), cToF, '°') + '</td><td>' + (dd ? dd + ' ' : '') + fmtRange(rangeOver(wind, now, to), kmhToMph, ' mph') + '</td></tr>' };
+    };
+    var r24 = row('Next 24 hours', 24), r48 = row('Next 48 hours', 48);
+    forecast = { s24: r24.s, s48: r48.s };
+    $('fcTotals').innerHTML = r24.html + r48.html;
+    renderNotice();
+    return fcP.then(function (periods) {
+      $('fcPeriods').innerHTML = periods.slice(0, 4).map(function (per) {
+        var s = Date.parse(per.startTime), e = Date.parse(per.endTime);
+        var snowTxt = periodSnow(per.detailedForecast);
+        if (!snowTxt) snowTxt = fmtSnow(sumOver(snow, s, e) / 25.4);
+        var snowy = snowTxt !== '0"' || /snow|flurr|sleet|freezing|wintry|blizzard/i.test(per.shortForecast || '');
+        var tr = rangeOver(temp, s, e);
+        var wind = String(per.windSpeed || '').replace(/ to /, '–');
+        return '<tr title="' + esc(per.shortForecast || '') + '"><td>' + esc(per.name) + '</td><td' + (snowy ? ' class="snowy"' : '') + '>' + esc(snowTxt) + '</td><td>' +
+          (tr ? fmtRange(tr, cToF, '°') : esc(per.temperature) + '°') + '</td><td>' + esc(((per.windDirection || '') + ' ' + wind).trim()) + '</td></tr>';
+      }).join('');
+    });
+  }).catch(function () {
+    $('fcTotals').innerHTML = '<tr><td colspan="4" class="muted">Forecast unavailable right now.</td></tr>';
+  });
 
   nws(NWS_ALERTS).then(function (d) {
     var seen = {};
@@ -589,8 +687,8 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener('change', function () { setTiles(); renderTrails(); });
 
 requestAnimationFrame(glide);
-setInterval(function () { renderLive(); }, 1000);
-setInterval(function () { if (!document.hidden) { renderTrails(); renderList(); } }, 60000); // age buckets drift
+setInterval(renderLive, 1000);
+setInterval(function () { if (!document.hidden) { renderTrails(); renderList(); renderSummary(); } }, 60000); // ages drift
 renderLegend(); renderSummary(); renderList();
 if (!document.hidden) start(); else renderLive();
 checkWeather();
