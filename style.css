@@ -256,9 +256,6 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .place { display: none; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .live.ok .pulse { animation: none; }
-}
 
 /* soften the street basemap so trails and trucks carry the color */
 :root:not([data-theme="dark"]) .leaflet-tile-pane { filter: saturate(0.45) brightness(1.08) contrast(0.92); }
@@ -268,3 +265,38 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 :root[data-theme="dark"] .tk .lab { color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 5px #000; }
 @media (max-width: 760px) { .legend { bottom: 44px; } .zoom { bottom: 118px; } }
+
+/* ---------- motion touches ---------- */
+/* rolling stat digits */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sv > span:not(.sr) { -webkit-user-select: none; user-select: none; }
+.sv .dg { display: inline-block; height: 1.15em; overflow: hidden; vertical-align: top; }
+.sv .strip { display: flex; flex-direction: column; transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sv .strip > span { height: 1.15em; line-height: 1.15em; text-align: center; }
+.sv .dg:nth-child(2) .strip { transition-delay: 0.04s; }
+.sv .dg:nth-child(3) .strip { transition-delay: 0.08s; }
+.sv .dg:nth-child(4) .strip { transition-delay: 0.12s; }
+
+/* sliding highlight behind the pressed toggle */
+.mapctl .seg, .tabs { position: relative; }
+.has-slide .slide {
+  position: absolute; left: 0; top: 0; z-index: 0; border-radius: 4px; background: var(--accent);
+  box-shadow: 0 1px 2px rgba(15,27,45,0.18);
+  transition: transform 0.38s cubic-bezier(0.3, 0.9, 0.2, 1), width 0.38s cubic-bezier(0.3, 0.9, 0.2, 1);
+}
+.has-slide button { position: relative; z-index: 1; transition: color 0.2s ease; }
+.has-slide button[aria-pressed="true"] { background: transparent; }
+.seg button:not([aria-pressed="true"]):hover, .tabs button:not([aria-pressed="true"]):hover { color: var(--accent-ink); }
+
+/* soft entrances */
+.enter tr { animation: rowIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 30ms); }
+@keyframes rowIn { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } }
+.tt td { transition: background-color 0.25s ease; }
+.notice:not([hidden]), .alert { animation: dropIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .live.ok .pulse { animation: none; }
+  .sv .strip, .has-slide .slide, .has-slide button, .tt td { transition: none; }
+  .enter tr, .notice:not([hidden]), .alert { animation: none; }
+}
